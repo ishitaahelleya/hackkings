@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>We the People District Map</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="./styles.css" />
+    <script defer src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+    <script defer src="./main.js"></script>
+  </head>
+  <body>
+    <div id="page-loader" class="page-loader" aria-hidden="true">
+      <div class="loader-content">
+        <div class="loader-quote">
+          <span class="loader-line loader-line-1">Political power comes from</span>
+          <span class="loader-line loader-line-2"><em class="loader-citizens">citizens</em>, not a <em class="loader-monarch">monarch</em>.</span>
+        </div>
+        <div class="loader-bar-wrap">
+          <div class="loader-bar"></div>
+        </div>
+        <p class="loader-sub">Loading your map…</p>
+      </div>
+    </div>
+    <main class="page">
+      <div class="page-bg">
+        <div class="bg-glow bg-glow-1"></div>
+        <div class="bg-glow bg-glow-2"></div>
+        <div class="bg-noise"></div>
+      </div>
+
+      <section class="map-shell">
+        <header class="map-header">
+          <div class="map-pill">
+            <span class="map-pill-dot"></span>
+            <span class="map-pill-text">We the People</span>
+          </div>
+          <h1 class="map-title">We the People Dashboard</h1>
+          <p class="map-subtitle">
+            Record a short opinion statement, analyze it into <span class="map-subtitle-strong">issue + stance + summary</span>,
+            then watch the map and charts update.
+          </p>
+        </header>
+
+        <section class="op-dashboard" aria-label="Opinion dashboard controls and charts">
+          <div class="op-grid">
+            <div class="op-panel op-panel--controls">
+              <div class="op-panel-header">
+                <h2 class="op-panel-title">New opinion call</h2>
+                <p class="op-panel-sub">Use your mic for speech-to-text, then analyze.</p>
+              </div>
+
+              <label class="op-label" for="phone-input">Phone number (demo)</label>
+              <input
+                id="phone-input"
+                class="op-input"
+                inputmode="tel"
+                autocomplete="tel"
+                placeholder="(555) 123-4567"
+              />
+
+              <div class="op-controls-row">
+                <button type="button" id="mic-btn" class="op-btn op-btn--secondary">
+                  <span class="op-btn-dot" aria-hidden="true"></span>
+                  <span id="mic-btn-text">Start mic</span>
+                </button>
+                <button type="button" id="clear-btn" class="op-btn op-btn--ghost">Clear</button>
+              </div>
+
+              <label class="op-label" for="transcript-input">Transcript</label>
+              <textarea
+                id="transcript-input"
+                class="op-textarea"
+                rows="6"
+                placeholder="Speak (or type) an opinion like: 'I support a clean energy bill because it lowers costs…'"
+              ></textarea>
+
+              <div class="op-controls-row">
+                <button type="button" id="analyze-btn" class="op-btn op-btn--primary" disabled>Analyze</button>
+                <div class="op-status" id="stt-status" aria-live="polite"></div>
+              </div>
+
+              <div class="op-result" id="result-card" aria-live="polite">
+                <div class="op-result-top">
+                  <div class="op-result-badge" id="result-stance">—</div>
+                  <div class="op-result-meta">
+                    <div class="op-result-issue" id="result-issue">Issue: —</div>
+                    <div class="op-result-sub" id="result-geo">Zip/District: —</div>
+                  </div>
+                </div>
+                <div class="op-result-summary" id="result-summary">Summary: —</div>
+              </div>
+            </div>
+
+            <div class="op-panel op-panel--insights">
+              <div class="op-panel-header">
+                <h2 class="op-panel-title">Live insights</h2>
+                <p class="op-panel-sub">Sample data loads on start; each analyzed call adds one record.</p>
+              </div>
+
+              <div class="op-kpis">
+                <div class="op-kpi">
+                  <div class="op-kpi-label">Total calls</div>
+                  <div class="op-kpi-value" id="kpi-total">0</div>
+                </div>
+                <div class="op-kpi">
+                  <div class="op-kpi-label">Support</div>
+                  <div class="op-kpi-value op-kpi-value--green" id="kpi-support">0</div>
+                </div>
+                <div class="op-kpi">
+                  <div class="op-kpi-label">Against</div>
+                  <div class="op-kpi-value op-kpi-value--red" id="kpi-against">0</div>
+                </div>
+              </div>
+
+              <div class="op-charts">
+                <div class="op-chart-card">
+                  <div class="op-chart-title">Stance breakdown</div>
+                  <canvas id="stance-chart" height="120"></canvas>
+                </div>
+                <div class="op-chart-card">
+                  <div class="op-chart-title">Top issues</div>
+                  <canvas id="issues-chart" height="120"></canvas>
+                </div>
+              </div>
+
+              <div class="op-filter-row">
+                <label class="op-label op-label--inline" for="issue-filter">Filter points by issue</label>
+                <select id="issue-filter" class="op-select"></select>
+              </div>
+              <p class="op-hint">Tip: click a dot on the map to see that call’s issue, stance, and summary.</p>
+            </div>
+          </div>
+        </section>
+
+        <div class="map-wrapper" id="map-wrapper">
+          <div class="map-viewport" id="map-viewport">
+          <svg
+            id="ca-map-svg"
+            class="ca-map"
+            viewBox="0 0 480 640"
+            role="img"
+            aria-labelledby="ca-map-title"
+          >
+            <title id="ca-map-title">
+              California congressional districts map
+            </title>
+            <g id="ca-regions-group" class="ca-regions">
+              <!-- Placeholder; replaced at runtime from california.json -->
+              <path
+                id="district-ca-09"
+                class="region district--active"
+                d="M 220 320 L 320 320 L 340 380 L 240 400 Z"
+              />
+            </g>
+            <g id="ca-labels-group"></g>
+          </svg>
+          </div>
+
+          <button type="button" id="zoom-out-btn" class="zoom-out-btn hidden" aria-label="Back to full map">
+            ← Back to map
+          </button>
+
+          <div id="dot-layer" class="dot-layer"></div>
+
+          <div id="info-box" class="info-box hidden" aria-live="polite">
+            <div class="info-box-inner">
+              <button
+                type="button"
+                class="info-box-close"
+                aria-label="Close info box"
+              >
+                ×
+              </button>
+              <div class="info-box-content" id="info-box-content"></div>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+  </body>
+</html>
