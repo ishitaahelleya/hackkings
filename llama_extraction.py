@@ -8,6 +8,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Literal, Optional
 
+from extraction import BILLS, ISSUES
+
 try:
     import ollama
 except ImportError:  # Optional dependency; only needed if you call the model.
@@ -58,6 +60,25 @@ class LlamaClient:
         message = response.get("message", {})
         content = message.get("content", "")
         return content or ""
+
+
+def detect_topics(transcript: str) -> list[tuple[str, str]]:
+    """
+    Identify all bills and issues mentioned in a transcript.
+
+    Returns
+    -------
+    List of (topic_name, topic_type) where topic_type is "bill" or "issue".
+    """
+    text = (transcript or "").lower()
+    topics: list[tuple[str, str]] = []
+    for bill in BILLS:
+        if bill.lower() in text:
+            topics.append((bill, "bill"))
+    for issue in ISSUES:
+        if issue.lower() in text:
+            topics.append((issue, "issue"))
+    return topics
 
 
 def _get_client(client: Optional[LlamaClient] = None) -> LlamaClient:
@@ -179,6 +200,7 @@ __all__ = [
     "LlamaClient",
     "Stance",
     "detect_stance",
+    "detect_topics",
     "summarize_reason",
 ]
 
