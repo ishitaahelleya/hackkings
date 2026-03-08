@@ -100,6 +100,7 @@ def llama_stance_and_reason(transcript, bill_name, issue_name):
     """
     Get bill_stance, bill_reason, issue_stance, issue_reason from llama_extraction.
     Returns dict with those four keys; empty string on missing topic or if Llama unavailable/fails.
+    Always tries to get an AI-generated summary (issue_reason) for the UI when Llama is available.
     """
     out = {"bill_stance": "", "bill_reason": "", "issue_stance": "", "issue_reason": ""}
     if not (detect_stance and summarize_reason):
@@ -107,6 +108,9 @@ def llama_stance_and_reason(transcript, bill_name, issue_name):
     transcript = (transcript or "").strip()
     if not transcript:
         return out
+
+    # Topic for summary: use detected issue or a generic prompt so we always get an AI summary
+    summary_topic = (issue_name or bill_name or "the main topic of the call").strip() or "the main topic of the call"
 
     if bill_name:
         try:
@@ -120,6 +124,14 @@ def llama_stance_and_reason(transcript, bill_name, issue_name):
             out["issue_reason"] = (summarize_reason(transcript, issue_name) or "").strip()[:500]
         except Exception:
             pass
+
+    # When we have no issue-specific reason yet, still get an AI summary for the UI (map dot, result card)
+    if not out["issue_reason"] and summary_topic:
+        try:
+            out["issue_reason"] = (summarize_reason(transcript, summary_topic) or "").strip()[:500]
+        except Exception:
+            pass
+
     return out
 
 
@@ -249,11 +261,12 @@ def api_analyze():
     # Bill stance and issue reason (and related) from llama_extraction when available
     llama_values = llama_stance_and_reason(transcript, bill_name, issue_name)
 
-    # So the UI shows Llama-derived stance/summary when we have them
+    # So the UI and map dot use Llama-derived stance and AI-generated summary when we have them
     if llama_values.get("issue_stance"):
         analysis["stance"] = llama_values["issue_stance"]
     if llama_values.get("issue_reason"):
         analysis["summary"] = llama_values["issue_reason"]
+    # If Llama didn't run or returned empty, keep mock summary (transcript snippet) as fallback
 
     # Append new row to CSV so dataset grows in real time
     try:

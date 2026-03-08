@@ -14,6 +14,17 @@ const svg = document.getElementById("ca-map-svg");
 
 
 const startRecordingBtn = document.getElementById("start-recording-btn");
+const micBtn = document.getElementById("mic-btn");
+const micBtnText = document.getElementById("mic-btn-text");
+const transcriptInput = document.getElementById("transcript-input");
+const analyzeBtn = document.getElementById("analyze-btn");
+const phoneInput = document.getElementById("phone-input");
+const clearBtn = document.getElementById("clear-btn");
+const resultStance = document.getElementById("result-stance");
+const resultIssue = document.getElementById("result-issue");
+const resultGeo = document.getElementById("result-geo");
+const resultSummary = document.getElementById("result-summary");
+const sttStatus = document.getElementById("stt-status");
 
 
 const kpiTotal = document.getElementById("kpi-total");
@@ -40,6 +51,11 @@ const records = [];
 let mediaRecorder = null;
 let audioChunks = [];
 let isRecording = false;
+
+// Speech-to-text (Web Speech API)
+let speechRecognition = null;
+let isListening = false;
+let finalTranscript = "";
 
 
 window.setTimeout(() => pageLoader?.classList.add("done"), 1600);
@@ -470,6 +486,115 @@ renderIssueFilter();
 renderDots();
 
 
+function setAnalyzeEnabled() {
+  if (!analyzeBtn || !transcriptInput) return;
+  const hasText = transcriptInput.value.trim().length > 0;
+  analyzeBtn.disabled = false;
+  analyzeBtn.classList.toggle("op-btn--disabled", !hasText);
+  analyzeBtn.setAttribute("aria-disabled", hasText ? "false" : "true");
+}
+setAnalyzeEnabled();
+transcriptInput?.addEventListener("input", setAnalyzeEnabled);
+
+
+function analyzeTranscriptClientSide(transcript, phone) {
+  const text = (transcript || "").trim().toLowerCase();
+  const issueRules = [
+    ["Clean Energy", /\b(clean energy|renewable|solar|wind|carbon|emissions?)\b/],
+    ["Healthcare", /\b(healthcare|medicaid|medicare|insurance|hospitals?)\b/],
+    ["Immigration", /\b(immigration|border|asylum|undocumented)\b/],
+    ["Housing", /\b(housing|rent|zoning|homeless|affordable)\b/],
+    ["Education", /\b(education|schools?|teachers?|college|student)\b/],
+    ["Taxes", /\b(taxes?|taxation|irs|property tax)\b/],
+    ["Public Safety", /\b(crime|police|safety|guns?|violence)\b/],
+  ];
+  let issue = "General Policy";
+  for (const [name, re] of issueRules) {
+    if (re.test(transcript || "")) {
+      issue = name;
+      break;
+    }
+  }
+  let stance = "neutral";
+  if (/\b(i\s+support|i'm\s+for|in\s+favor|approve|vote\s+yes)\b/.test(text) && !/\b(oppose|against|reject|vote\s+no)\b/.test(text)) stance = "support";
+  else if (/\b(i\s+oppose|i'm\s+against|against|reject|vote\s+no)\b/.test(text)) stance = "against";
+  const summary = (transcript || "").trim().length > 180 ? (transcript || "").trim().slice(0, 180) + "…" : ((transcript || "").trim() || "No transcript provided.");
+  const digits = String(phone || "").replace(/\D/g, "");
+  const zipcode = digits.length >= 5 ? digits.slice(-5) : "95202";
+  return { issue, stance, summary, zipcode, district: "CA-09" };
+}
+
+
+function showResultCard(data) {
+  if (resultStance) resultStance.textContent = data.stance || "—";
+  if (resultIssue) resultIssue.textContent = "Issue: " + (data.issue || "—");
+  if (resultGeo) resultGeo.textContent = "Zip/District: " + (data.zipcode || "—") + " / " + (data.district || "CA-09");
+  if (resultSummary) resultSummary.textContent = data.summary || "—";
+}
+
+
+analyzeBtn?.addEventListener("click", async () => {
+  const transcript = transcriptInput?.value?.trim() || "";
+  if (!transcript) {
+    if (sttStatus) sttStatus.textContent = "Enter or speak a transcript first.";
+    return;
+  }
+  const phone = phoneInput?.value?.trim() || "";
+  const apiBase = (typeof window !== "undefined" && window.OPINION_API_BASE) || "http://localhost:5001";
+
+  if (sttStatus) sttStatus.textContent = "Analyzing…";
+  analyzeBtn.classList.add("op-btn--disabled");
+  analyzeBtn.setAttribute("aria-busy", "true");
+
+  let data;
+  try {
+    const res = await fetch(apiBase + "/api/analyze", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ transcript, phone }),
+    });
+    const json = await res.json();
+    if (!res.ok) {
+      throw new Error(json.error || "Analysis failed");
+    }
+    data = json;
+  } catch (err) {
+    console.warn("Backend unavailable, using client-side analysis:", err);
+    data = analyzeTranscriptClientSide(transcript, phone);
+  }
+
+  const nextId = String(records.length + 1);
+  const rng = mulberry32(hashToSeed(nextId));
+  const summaryForDot = (data.summary && String(data.summary).trim())
+    ? String(data.summary).trim()
+    : transcript.slice(0, 120);
+  upsertRecord({
+    id: nextId,
+    issue: data.issue || "General Policy",
+    stance: data.stance === "oppose" ? "against" : (data.stance || "neutral"),
+    summary: summaryForDot,
+    transcript,
+    dot: { nx: rng(), ny: rng(), size: 12 + rng() * 16 },
+  });
+
+  showResultCard(data);
+  if (sttStatus) sttStatus.textContent = "Added to map.";
+  analyzeBtn.removeAttribute("aria-busy");
+  setAnalyzeEnabled();
+});
+
+
+clearBtn?.addEventListener("click", () => {
+  if (transcriptInput) transcriptInput.value = "";
+  setAnalyzeEnabled();
+  if (sttStatus) sttStatus.textContent = "";
+  if (resultStance) resultStance.textContent = "—";
+  if (resultIssue) resultIssue.textContent = "Issue: —";
+  if (resultGeo) resultGeo.textContent = "Zip/District: —";
+  if (resultSummary) resultSummary.textContent = "—";
+});
+
+
 closeBtn?.addEventListener("click",(e)=>{
  e.stopPropagation();
  hideInfoBox();
@@ -497,6 +622,85 @@ document.addEventListener("keydown",(e)=>{
    hideInfoBox();
    closeDetailModal();
  }
+});
+
+
+/* =========================
+  SPEECH-TO-TEXT (START MIC)
+  ========================= */
+
+function getSpeechRecognition() {
+  return window.SpeechRecognition || window.webkitSpeechRecognition;
+}
+
+function startMic() {
+  const SpeechRecognition = getSpeechRecognition();
+  if (!SpeechRecognition) {
+    alert("Speech recognition is not supported in this browser. Try Chrome or Edge.");
+    return;
+  }
+  if (!transcriptInput) return;
+
+  finalTranscript = transcriptInput.value || "";
+  speechRecognition = new SpeechRecognition();
+  speechRecognition.continuous = true;
+  speechRecognition.interimResults = true;
+  speechRecognition.lang = "en-US";
+
+  speechRecognition.onresult = (e) => {
+    let interim = "";
+    for (let i = e.resultIndex; i < e.results.length; i++) {
+      const transcript = e.results[i][0].transcript;
+      if (e.results[i].isFinal) {
+        finalTranscript += transcript + " ";
+      } else {
+        interim += transcript;
+      }
+    }
+    transcriptInput.value = finalTranscript + interim;
+    transcriptInput.scrollTop = transcriptInput.scrollHeight;
+  };
+
+  speechRecognition.onerror = (e) => {
+    if (e.error === "not-allowed" || e.error === "service-not-allowed") {
+      alert("Microphone permission is required for speech-to-text.");
+      stopMic();
+    }
+  };
+
+  speechRecognition.onend = () => {
+    if (isListening) {
+      speechRecognition.start();
+    }
+  };
+
+  try {
+    speechRecognition.start();
+    isListening = true;
+    if (micBtnText) micBtnText.textContent = "Stop mic";
+    if (micBtn) micBtn.classList.add("op-btn--listening");
+  } catch (err) {
+    console.error("Speech recognition start failed", err);
+    alert("Could not start microphone. Check permissions.");
+  }
+}
+
+function stopMic() {
+  if (speechRecognition && isListening) {
+    isListening = false;
+    speechRecognition.stop();
+    speechRecognition = null;
+  }
+  if (micBtnText) micBtnText.textContent = "Start mic";
+  if (micBtn) micBtn.classList.remove("op-btn--listening");
+}
+
+micBtn?.addEventListener("click", () => {
+  if (!isListening) {
+    startMic();
+  } else {
+    stopMic();
+  }
 });
 
 
