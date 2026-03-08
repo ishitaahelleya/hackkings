@@ -12,7 +12,15 @@ from typing import Optional
 
 import pandas as pd
 
-from llama_extraction import LlamaClient, detect_stance, detect_topics, summarize_reason
+from llama_extraction import (
+    LlamaClient,
+    detect_stance,
+    detect_stance_batch,
+    detect_stance_fallback,
+    detect_topics,
+    is_ollama_available,
+    summarize_reason,
+)
 
 
 def update_dataset_with_stance(
@@ -21,9 +29,12 @@ def update_dataset_with_stance(
     topic_name: str = "the bill",
     topic_column: Optional[str] = None,
     client: Optional[LlamaClient] = None,
+    max_rows: int = 10,
+    batch_size: int = 5,
 ) -> None:
     """
-    Read a dataset CSV, run stance detection on each transcript, and save the updated dataset.
+    Read a dataset CSV, run stance detection on up to max_rows transcripts
+    in batches of batch_size, and save the updated dataset.
 
     Parameters
     ----------
@@ -39,6 +50,10 @@ def update_dataset_with_stance(
         If provided and the column exists, per-row values override topic_name.
     client
         Optional LlamaClient (e.g. for tests). If None, a default client is used.
+    max_rows
+        Maximum number of rows to update with LLM stance (default 10).
+    batch_size
+        Number of transcripts per model call (default 5).
     """
     input_path = Path(input_csv_path)
     output_path = Path(output_csv_path)
@@ -53,18 +68,43 @@ def update_dataset_with_stance(
         )
 
     df = pd.read_csv(input_path)
-    transcripts = df["transcript_text"].astype(str)
+    n_total = len(df)
+    n_to_update = min(max_rows, n_total)
 
-    # Resolve topic per row: use topic_column if present, else topic_name
+    transcripts = df["transcript_text"].astype(str)
     if topic_column and topic_column in df.columns:
         topics = df[topic_column].astype(str)
     else:
-        topics = pd.Series([topic_name] * len(df))
+        topics = pd.Series([topic_name] * n_total)
 
-    stances = []
-    for transcript, topic in zip(transcripts, topics):
-        stance = detect_stance(transcript, topic, client=client)
-        stances.append(stance)
+    stances: list[str] = []
+    use_ollama = is_ollama_available()
+    if not use_ollama:
+        print("Ollama not running; using keyword-based stance fallback.")
+    if use_ollama:
+        # Batches of batch_size (e.g. 5) for the first n_to_update rows
+        for start in range(0, n_to_update, batch_size):
+            end = min(start + batch_size, n_to_update)
+            batch = [
+                (transcripts.iloc[i], topics.iloc[i])
+                for i in range(start, end)
+            ]
+            batch_stances = detect_stance_batch(batch, client=client)
+            stances.extend(batch_stances)
+            print(f"  Stance batch {start // batch_size + 1}: rows {start + 1}-{end}")
+        # Fill remaining updated rows if batch returned fewer (shouldn't happen)
+        while len(stances) < n_to_update:
+            stances.append("neutral")
+    else:
+        for i in range(n_to_update):
+            stances.append(detect_stance_fallback(transcripts.iloc[i], topics.iloc[i]))
+
+    # For rows beyond n_to_update, use neutral (or fallback)
+    for i in range(n_to_update, n_total):
+        if use_ollama:
+            stances.append("neutral")
+        else:
+            stances.append(detect_stance_fallback(transcripts.iloc[i], topics.iloc[i]))
 
     df = df.copy()
     df["stance"] = stances
@@ -129,7 +169,10 @@ def update_dataset_with_reasoning(
 
     df = df.copy()
 
-    for row_idx in range(len(df)):
+    n_to_process = min(10, len(df))
+    print(f"Updating reasoning for first {n_to_process} rows.")
+
+    for row_idx in range(n_to_process):
         transcript = df.loc[row_idx, "transcript_text"]
 
         # Robust to missing/NaN values
@@ -189,16 +232,26 @@ if __name__ == "__main__":
     """
     import sys
 
-    CSV_PATH = Path("dataset/calls_dataset.csv")
+    CSV_PATH = Path("calls_dataset.csv")
 
     if not CSV_PATH.exists():
         print(f"File not found: {CSV_PATH}")
         sys.exit(1)
 
     print("Adding stance column...")
-    update_dataset_with_stance(CSV_PATH, CSV_PATH)
+    try:
+        update_dataset_with_stance(CSV_PATH, CSV_PATH)
+    except Exception as e:
+        err = str(e).lower()
+        if "not found" in err or "404" in err:
+            print("\n  → Model 'llama3:8b' not found. Pull it first (e.g. in Terminal.app):")
+            print("     ollama pull llama3:8b\n")
+        raise
 
-    print("Adding reasoning columns (bill_reason, issue_reason)...")
-    update_dataset_with_reasoning(CSV_PATH, CSV_PATH)
+    if is_ollama_available():
+        print("Adding reasoning columns (bill_reason, issue_reason)...")
+        update_dataset_with_reasoning(CSV_PATH, CSV_PATH)
+    else:
+        print("Skipping reasoning columns (Ollama not running).")
 
     print("Done. Updated", CSV_PATH)

@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>We the People Dashboard</title>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+
+<link rel="stylesheet" href="style2.css">
+
+<script defer src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script defer src="./main.js"></script>
+
+</head>
+
+<body>
+
+<header class="gov-header">
+
+<div class="gov-top">
+<span>Visitors</span>
+<span>Media</span>
+<span>Employment</span>
+</div>
+
+<div class="gov-main">
+
+<div class="gov-title">
+United States House of Representatives
+</div>
+
+<input class="gov-search" placeholder="Search">
+
+</div>
+
+</header>
+
+
+<section class="hero">
+
+<div class="hero-overlay">
+
+<div class="hero-content">
+
+<h1>We the People Dashboard</h1>
+
+<p>
+Record a short opinion statement, analyze it into
+<strong>issue + stance + summary</strong>,
+then watch the map and charts update.
+</p>
+
+</div>
+
+</div>
+
+</section>
+
+
+<main class="page">
+
+<section class="dashboard-grid">
+
+<div class="panel">
+
+<h2>New opinion call</h2>
+
+<label>Phone number</label>
+
+<input id="phone-input" placeholder="(555) 123-4567">
+
+<div class="btn-row">
+
+<button id="mic-btn">Start mic</button>
+<button id="clear-btn">Clear</button>
+
+</div>
+
+<label>Transcript</label>
+
+<textarea id="transcript-input" rows="6"></textarea>
+
+<button id="analyze-btn" class="primary">Analyze</button>
+
+<div id="result-card">
+
+<div id="result-stance">—</div>
+<div id="result-issue">Issue —</div>
+<div id="result-geo">Zip/District —</div>
+<div id="result-summary">Summary —</div>
+
+</div>
+
+</div>
+
+
+<div class="panel">
+
+<h2>Live insights</h2>
+
+<div class="kpis">
+
+<div>
+<div class="kpi-label">Total Calls</div>
+<div id="kpi-total" class="kpi">0</div>
+</div>
+
+<div>
+<div class="kpi-label">Support</div>
+<div id="kpi-support" class="kpi green">0</div>
+</div>
+
+<div>
+<div class="kpi-label">Against</div>
+<div id="kpi-against" class="kpi red">0</div>
+</div>
+
+</div>
+
+<div class="chart">
+
+<h3>Stance breakdown</h3>
+<canvas id="stance-chart"></canvas>
+
+</div>
+
+<div class="chart">
+
+<h3>Top issues</h3>
+<canvas id="issues-chart"></canvas>
+
+</div>
+
+<select id="issue-filter"></select>
+
+</div>
+
+</section>
+
+
+<div class="map-wrapper">
+
+<svg id="ca-map-svg" class="ca-map" viewBox="0 0 480 640">
+
+<g id="ca-regions-group">
+
+<path
+id="district-ca-09"
+class="region district--active"
+d="M 220 320 L 320 320 L 340 380 L 240 400 Z"
+/>
+
+</g>
+
+<g id="ca-labels-group">
+
+<text
+x="280"
+y="360"
+text-anchor="middle"
+font-size="18"
+font-weight="700"
+fill="#fff"
+>
+CA-09
+</text>
+
+</g>
+
+</svg>
+
+<div id="dot-layer" class="dot-layer"></div>
+
+<div id="info-box" class="info-box hidden">
+
+<div id="info-box-content"></div>
+
+</div>
+
+</div>
+
+</main>
+
+</body>
+</html>

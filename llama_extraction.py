@@ -19,16 +19,40 @@ except ImportError:  # Optional dependency; only needed if you call the model.
 Stance = Literal["support", "oppose", "neutral"]
 
 
+def is_ollama_available() -> bool:
+    """Return True if the ollama package is installed and the Ollama server is reachable."""
+    if ollama is None:
+        return False
+    try:
+        ollama.list()
+        return True
+    except Exception:
+        return False
+
+
+def detect_stance_fallback(transcript: str, topic_name: str) -> Stance:
+    """
+    Simple keyword-based stance detection when Ollama is not available.
+    """
+    text = (transcript or "").lower()
+    if "support" in text or " favor " in text or " yes " in text or "approve" in text or "pass" in text:
+        if "oppose" in text or "against" in text or " no " in text or "reject" in text:
+            return "neutral"
+        return "support"
+    if "oppose" in text or "against" in text or " no " in text or "reject" in text or "block" in text:
+        return "oppose"
+    return "neutral"
+
+
 @dataclass
 class LlamaConfig:
     """
     Basic configuration for accessing an Ollama Llama 3 chat model.
 
-    By default this assumes you have `ollama` running locally and the
-    `llama3` model available (e.g. `ollama pull llama3`).
+    By default uses llama3:8b (smaller/faster). Alternative: llama3:8b-instruct-q4_K_M.
     """
 
-    model: str = "llama3"
+    model: str = "llama3:8b"
 
 
 class LlamaClient:
@@ -146,6 +170,71 @@ def detect_stance(
     return "neutral"
 
 
+def detect_stance_batch(
+    items: list[tuple[str, str]],
+    client: Optional[LlamaClient] = None,
+) -> list[Stance]:
+    """
+    Determine stance for up to 5 (transcript, topic) pairs in a single model call.
+
+    items: list of (transcript, topic_name), max length 5.
+    Returns: list of Stance, same length as items.
+    """
+    if not items:
+        return []
+    if len(items) > 5:
+        raise ValueError("detect_stance_batch accepts at most 5 items")
+
+    llama = _get_client(client)
+
+    system_prompt = (
+        "You are an analyst classifying callers' stances on specific bills or issues "
+        "based on call transcripts.\n"
+        "For each given (topic, transcript) pair you must output exactly one word: "
+        "'support', 'oppose', or 'neutral'.\n"
+        "- support = caller wants the representative to vote YES / approve / pass.\n"
+        "- oppose = caller wants the representative to vote NO / reject / block.\n"
+        "- neutral = mixed, unclear, or not about that specific topic.\n"
+        "You must output exactly one word per item, on its own line, in the same order "
+        "as the items (no numbers, no extra text)."
+    )
+
+    lines = []
+    for i, (transcript, topic) in enumerate(items, 1):
+        lines.append(f"[Item {i}] Topic: {topic}")
+        lines.append(f"Transcript: {transcript[:800]}{'...' if len(transcript) > 800 else ''}")
+    user_prompt = (
+        "Classify each item below. Output exactly "
+        + str(len(items))
+        + " lines, one word per line (support, oppose, or neutral), in order.\n\n"
+        + "\n".join(lines)
+        + "\n\nYour "
+        + str(len(items))
+        + " answers (one per line):"
+    )
+
+    raw = llama.chat(system_prompt, user_prompt).strip().lower()
+
+    stances: list[Stance] = []
+    for line in raw.splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        # Take first word in case model added extra text
+        word = line.split()[0] if line.split() else line
+        if "support" in word and "oppose" not in word:
+            stances.append("support")
+        elif "oppose" in word or "against" in word:
+            stances.append("oppose")
+        else:
+            stances.append("neutral")
+        if len(stances) >= len(items):
+            break
+    while len(stances) < len(items):
+        stances.append("neutral")
+    return stances[: len(items)]
+
+
 def summarize_reason(
     transcript: str,
     topic_name: str,
@@ -200,7 +289,10 @@ __all__ = [
     "LlamaClient",
     "Stance",
     "detect_stance",
+    "detect_stance_batch",
+    "detect_stance_fallback",
     "detect_topics",
+    "is_ollama_available",
     "summarize_reason",
 ]
 

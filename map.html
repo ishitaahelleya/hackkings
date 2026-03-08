@@ -33,12 +33,6 @@ const svg = d3.select("svg");
 d3.json("ca09.geojson").then(data => {
 
     const projection = d3.geoMercator()
-        .fitSize([width, height], data);
-
-    const path = d3.geoPath().projection(projection);
-
-    svg.selectAll("path")
-        .data(data.features)
         .enter()
         .append("path")
         .attr("d", path)
