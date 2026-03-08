@@ -1,0 +1,111 @@
+"""
+Bridge script: fills missing bill_name and issue_name in a CSV dataset
+by calling extraction functions on each transcript.
+
+This script does NOT create a dataset or run a server. It only:
+- Loads an existing CSV
+- Calls process_transcript() on each transcript_text
+- Fills empty bill_name and issue_name cells with the returned values
+- Saves the result back to the same CSV file (overwrites the original).
+
+How to run:
+  1. Put your CSV dataset in the same folder as this script (or set INPUT_CSV above).
+  2. Ensure transcript_extractor.py is in the same folder and defines process_transcript(transcript).
+  3. From a terminal in this folder, run:
+       python fill_dataset_from_transcripts.py
+  4. The original CSV file will be updated in place.
+"""
+
+import pandas as pd
+from extraction import process_transcript
+
+# ---------------------------------------------------------------------------
+# Configuration: change these if your filenames differ
+# ---------------------------------------------------------------------------
+INPUT_CSV = "calls_dataset.csv"
+OUTPUT_CSV = "calls_dataset.csv"
+
+# Column names used by this script (must match your CSV)
+COL_TRANSCRIPT = "transcript_text"
+COL_BILL_NAME = "bill_name"
+COL_ISSUE_NAME = "issue_name"
+
+
+def main():
+    # -----------------------------------------------------------------------
+    # Step 1: Load the CSV dataset into a pandas DataFrame
+    # -----------------------------------------------------------------------
+    print(f"Loading dataset from: {INPUT_CSV}")
+    df = pd.read_csv(INPUT_CSV)
+
+    # -----------------------------------------------------------------------
+    # Step 2: Initialize counters for reporting
+    # -----------------------------------------------------------------------
+    rows_processed = 0   # rows we actually ran through the extractor
+    rows_updated = 0     # rows where we filled at least one missing value
+    rows_skipped = 0     # rows skipped (e.g. missing transcript_text)
+
+    # -----------------------------------------------------------------------
+    # Step 3: Iterate over each row and fill missing values
+    # -----------------------------------------------------------------------
+    for index, row in df.iterrows():
+        # Skip rows where transcript_text is missing or empty
+        transcript = row.get(COL_TRANSCRIPT)
+        if pd.isna(transcript) or (isinstance(transcript, str) and not transcript.strip()):
+            rows_skipped += 1
+            continue
+
+        # Call the extraction function (provided by your teammate)
+        try:
+            result = process_transcript(transcript)
+        except Exception as e:
+            print(f"Warning: extraction failed for row {index}: {e}")
+            rows_skipped += 1
+            continue
+
+        if not isinstance(result, dict):
+            print(f"Warning: process_transcript did not return a dict for row {index}, skipping.")
+            rows_skipped += 1
+            continue
+
+        rows_processed += 1
+        row_was_updated = False
+
+        # Fill bill_name only if it is currently empty
+        current_bill = row.get(COL_BILL_NAME)
+        if pd.isna(current_bill) or (isinstance(current_bill, str) and not str(current_bill).strip()):
+            new_bill = result.get("bill_name")
+            if new_bill is not None and (not isinstance(new_bill, str) or new_bill.strip()):
+                df.at[index, COL_BILL_NAME] = new_bill
+                row_was_updated = True
+
+        # Fill issue_name only if it is currently empty
+        current_issue = row.get(COL_ISSUE_NAME)
+        if pd.isna(current_issue) or (isinstance(current_issue, str) and not str(current_issue).strip()):
+            new_issue = result.get("issue_name")
+            if new_issue is not None and (not isinstance(new_issue, str) or new_issue.strip()):
+                df.at[index, COL_ISSUE_NAME] = new_issue
+                row_was_updated = True
+
+        if row_was_updated:
+            rows_updated += 1
+
+    # -----------------------------------------------------------------------
+    # Step 4: Save the updated dataset to a new CSV (other columns unchanged)
+    # -----------------------------------------------------------------------
+    df.to_csv(OUTPUT_CSV, index=False)
+    print(f"Saved updated dataset to: {OUTPUT_CSV}")
+
+    # -----------------------------------------------------------------------
+    # Step 5: Print summary counts
+    # -----------------------------------------------------------------------
+    print("\n--- Summary ---")
+    print(f"Rows processed (extractor called): {rows_processed}")
+    print(f"Rows updated (at least one value filled): {rows_updated}")
+    print(f"Rows skipped (missing transcript or error): {rows_skipped}")
+
+
+if __name__ == "__main__":
+    main()
+
+
