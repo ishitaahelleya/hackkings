@@ -33,10 +33,33 @@ COL_ISSUE_NAME = "issue_name"
 
 def main():
     # -----------------------------------------------------------------------
+    # Parse command-line options for flexibility
+    # -----------------------------------------------------------------------
+    import argparse
+    parser = argparse.ArgumentParser(
+        description="Fill missing bill/issue names and optionally sort the dataset."
+    )
+    parser.add_argument(
+        "--input", "-i",
+        default=INPUT_CSV,
+        help="Path to input CSV file (default: calls_dataset.csv)"
+    )
+    parser.add_argument(
+        "--sort-by", "-s",
+        help="Column name to sort by after processing"
+    )
+    parser.add_argument(
+        "--desc", action="store_true",
+        help="Sort in descending order (default is ascending)"
+    )
+    args = parser.parse_args()
+
+    # -----------------------------------------------------------------------
     # Step 1: Load the CSV dataset into a pandas DataFrame
     # -----------------------------------------------------------------------
-    print(f"Loading dataset from: {INPUT_CSV}")
-    df = pd.read_csv(INPUT_CSV)
+    INPUT = args.input
+    print(f"Loading dataset from: {INPUT}")
+    df = pd.read_csv(INPUT)
 
     # -----------------------------------------------------------------------
     # Step 2: Initialize counters for reporting
@@ -91,10 +114,22 @@ def main():
             rows_updated += 1
 
     # -----------------------------------------------------------------------
-    # Step 4: Save the updated dataset to a new CSV (other columns unchanged)
+    # Optional sorting before saving
     # -----------------------------------------------------------------------
-    df.to_csv(OUTPUT_CSV, index=False)
-    print(f"Saved updated dataset to: {OUTPUT_CSV}")
+    if args.sort_by:
+        sort_col = args.sort_by
+        if sort_col in df.columns:
+            df = df.sort_values(by=sort_col, ascending=not args.desc)
+            print(f"Dataset sorted by '{sort_col}' (descending={args.desc}).")
+        else:
+            print(f"Warning: sort column '{sort_col}' not found in dataset; skipping sort.")
+
+    # -----------------------------------------------------------------------
+    # Step 4: Save the updated dataset back to the CSV
+    # -----------------------------------------------------------------------
+    output_path = INPUT if OUTPUT_CSV == INPUT_CSV else OUTPUT_CSV
+    df.to_csv(output_path, index=False)
+    print(f"Saved updated dataset to: {output_path}")
 
     # -----------------------------------------------------------------------
     # Step 5: Print summary counts

@@ -95,25 +95,32 @@ function escapeHtml(v){
 }
 
 
+function getVisibleRecords(){
+  const sel = issueFilter?.value || "all";
+  if(!sel || sel === "all") return records;
+  return records.filter(r => r.issue === sel);
+}
+
 function renderKPIs(){
- kpiTotal.textContent = records.length;
- kpiSupport.textContent =
-   records.filter(r=>r.stance==="support").length;
- kpiAgainst.textContent =
-   records.filter(r=>r.stance==="against").length;
+  const subset = getVisibleRecords();
+  kpiTotal.textContent = subset.length;
+  kpiSupport.textContent =
+    subset.filter(r=>r.stance==="support").length;
+  kpiAgainst.textContent =
+    subset.filter(r=>r.stance==="against").length;
 }
 
 
 function computeStanceCounts(){
  const c={support:0,against:0,neutral:0};
- records.forEach(r=>c[r.stance]++);
+ getVisibleRecords().forEach(r=>c[r.stance]++);
  return c;
 }
 
 
 function computeTopIssues(){
  const map=new Map();
- records.forEach(r=>{
+ getVisibleRecords().forEach(r=>{
    map.set(r.issue,(map.get(r.issue)||0)+1);
  });
  return [...map.entries()]
@@ -196,28 +203,34 @@ function renderCharts(){
 
 
 function renderIssueFilter(){
+  let issues=[...new Set(records.map(r=>r.issue))];
+  // sort the issue list alphabetically for consistent ordering
+  issues.sort((a,b)=>a.localeCompare(b));
 
+  issueFilter.innerHTML="";
 
- const issues=[...new Set(records.map(r=>r.issue))];
+  const all=document.createElement("option");
+  all.value="all";
+  all.textContent="All issues";
+  issueFilter.appendChild(all);
 
+  issues.forEach(issue=>{
+    const o=document.createElement("option");
+    o.value=issue;
+    o.textContent=issue;
+    issueFilter.appendChild(o);
+  });
 
- issueFilter.innerHTML="";
-
-
- const all=document.createElement("option");
- all.value="all";
- all.textContent="All issues";
-
-
- issueFilter.appendChild(all);
-
-
- issues.forEach(issue=>{
-   const o=document.createElement("option");
-   o.value=issue;
-   o.textContent=issue;
-   issueFilter.appendChild(o);
- });
+  // wire up change listener once filter exists
+  // avoid adding multiple handlers if this function runs repeatedly
+  if (!issueFilter.dataset.listener) {
+    issueFilter.addEventListener("change",()=>{
+      renderKPIs();
+      renderCharts();
+      renderDots();
+    });
+    issueFilter.dataset.listener = "1";
+  }
 }
 
 
@@ -266,19 +279,16 @@ function closeDetailModal(){
 
 function renderDots(){
 
+  dotLayer.innerHTML="";
 
- dotLayer.innerHTML="";
+  const rect = mapWrapper.getBoundingClientRect();
+  const districtRect = ca09.getBoundingClientRect();
 
+  const w = districtRect.width;
+  const h = districtRect.height;
 
- const rect = mapWrapper.getBoundingClientRect();
- const districtRect = ca09.getBoundingClientRect();
-
-
- const w = districtRect.width;
- const h = districtRect.height;
-
-
- records.forEach(r=>{
+  const visible = getVisibleRecords();
+  visible.forEach(r=>{
 
 
    const dot=document.createElement("button");
