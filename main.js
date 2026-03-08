@@ -36,6 +36,17 @@ const stanceChartCanvas = document.getElementById("stance-chart");
 const issuesChartCanvas = document.getElementById("issues-chart");
 const issueFilter = document.getElementById("issue-filter");
 
+// known possible issues (matches extraction rules and/or dataset values)
+const ALL_ISSUES = [
+  "Gaza",
+  "Iran",
+  "ICE",
+  "immigration",
+  "housing",
+  "cost of living",
+  // "General Policy" is used as a fallback when nothing else matches
+];
+
 
 const detailModal = document.getElementById("detail-modal");
 const detailModalClose = document.getElementById("detail-modal-close");
@@ -203,7 +214,12 @@ function renderCharts(){
 
 
 function renderIssueFilter(){
-  let issues=[...new Set(records.map(r=>r.issue))];
+  // start from the full list of possible issues; include any that have been seen
+  let issues = [...new Set([...ALL_ISSUES, ...records.map(r=>r.issue)])];
+  // optionally include "General Policy" if records contain it
+  if(records.some(r=>r.issue==="General Policy") && !issues.includes("General Policy")){
+    issues.push("General Policy");
+  }
   // sort the issue list alphabetically for consistent ordering
   issues.sort((a,b)=>a.localeCompare(b));
 
