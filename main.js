@@ -17,9 +17,16 @@ const kpiTotal = document.getElementById("kpi-total");
 const kpiSupport = document.getElementById("kpi-support");
 const kpiAgainst = document.getElementById("kpi-against");
 
+<<<<<<< HEAD
 const stanceChartCanvas = document.getElementById("stance-chart");
 const issuesChartCanvas = document.getElementById("issues-chart");
 const issueFilter = document.getElementById("issue-filter");
+=======
+  const kpiTotal = document.getElementById("kpi-total");
+  const kpiSupport = document.getElementById("kpi-support");
+  const kpiAgainst = document.getElementById("kpi-against");
+  const kpiNeutral = document.getElementById("kpi-neutral");
+>>>>>>> refs/remotes/origin/main
 
 const detailModal = document.getElementById("detail-modal");
 const detailModalClose = document.getElementById("detail-modal-close");
@@ -128,7 +135,16 @@ function ensureCharts(){
   }
 }
 
+<<<<<<< HEAD
 function renderCharts(){
+=======
+  const renderKPIs=()=>{
+    kpiTotal.textContent=records.length;
+    kpiSupport.textContent=records.filter(r=>r.stance==="support").length;
+    kpiAgainst.textContent=records.filter(r=>r.stance==="against").length;
+    if(kpiNeutral)kpiNeutral.textContent=records.filter(r=>r.stance==="neutral").length;
+  };
+>>>>>>> refs/remotes/origin/main
 
   ensureCharts();
 

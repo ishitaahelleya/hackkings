@@ -539,6 +539,10 @@ body {
   color: rgba(239, 68, 68, 0.92);
 }
 
+.op-kpi-value--neutral {
+  color: rgba(148, 163, 184, 0.95);
+}
+
 .op-charts {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
