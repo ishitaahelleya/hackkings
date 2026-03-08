@@ -6,14 +6,14 @@ This script does NOT create a dataset or run a server. It only:
 - Loads an existing CSV
 - Calls process_transcript() on each transcript_text
 - Fills empty bill_name and issue_name cells with the returned values
-- Saves the result to a new CSV file.
+- Saves the result back to the same CSV file (overwrites the original).
 
 How to run:
   1. Put your CSV dataset in the same folder as this script (or set INPUT_CSV above).
   2. Ensure transcript_extractor.py is in the same folder and defines process_transcript(transcript).
   3. From a terminal in this folder, run:
        python fill_dataset_from_transcripts.py
-  4. Find the result in updated_dataset.csv.
+  4. The original CSV file will be updated in place.
 """
 
 import pandas as pd
@@ -23,7 +23,7 @@ from extraction import process_transcript
 # Configuration: change these if your filenames differ
 # ---------------------------------------------------------------------------
 INPUT_CSV = "calls_dataset.csv"
-OUTPUT_CSV = "updated_dataset.csv"
+OUTPUT_CSV = "calls_dataset.csv"
 
 # Column names used by this script (must match your CSV)
 COL_TRANSCRIPT = "transcript_text"
@@ -107,3 +107,5 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+
