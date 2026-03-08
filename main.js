@@ -28,6 +28,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   const kpiTotal = document.getElementById("kpi-total");
   const kpiSupport = document.getElementById("kpi-support");
   const kpiAgainst = document.getElementById("kpi-against");
+  const kpiNeutral = document.getElementById("kpi-neutral");
 
   const stanceChartCanvas = document.getElementById("stance-chart");
   const issuesChartCanvas = document.getElementById("issues-chart");
@@ -101,6 +102,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     kpiTotal.textContent=records.length;
     kpiSupport.textContent=records.filter(r=>r.stance==="support").length;
     kpiAgainst.textContent=records.filter(r=>r.stance==="against").length;
+    if(kpiNeutral)kpiNeutral.textContent=records.filter(r=>r.stance==="neutral").length;
   };
 
   const computeStanceCounts=()=>{
