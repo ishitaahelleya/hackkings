@@ -1,0 +1,4 @@
+flask>=3.0.0
+flask-cors>=4.0.0
+# Optional: for bill_stance / issue_reason from llama_extraction (requires Ollama + llama3)
+ollama>=0.3.0

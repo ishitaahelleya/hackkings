@@ -12,6 +12,8 @@
     />
     <link rel="stylesheet" href="./styles.css" />
     <script defer src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+    <!-- Point to local backend so voice → transcript → analyze appends to dataset in real time -->
+    <script>window.OPINION_API_BASE = "http://localhost:5001";</script>
     <script defer src="./main.js"></script>
   </head>
   <body>
