@@ -178,3 +178,27 @@ def update_dataset_with_reasoning(
 
     df.to_csv(output_path, index=False)
     print(f"Saved updated dataset to {output_path}")
+
+
+if __name__ == "__main__":
+    """
+    Run this file to fill in stance and reasoning columns in place.
+
+    Updates dataset/calls_dataset.csv (reads and writes the same file).
+    Run: python3 update_dataset.py
+    """
+    import sys
+
+    CSV_PATH = Path("dataset/calls_dataset.csv")
+
+    if not CSV_PATH.exists():
+        print(f"File not found: {CSV_PATH}")
+        sys.exit(1)
+
+    print("Adding stance column...")
+    update_dataset_with_stance(CSV_PATH, CSV_PATH)
+
+    print("Adding reasoning columns (bill_reason, issue_reason)...")
+    update_dataset_with_reasoning(CSV_PATH, CSV_PATH)
+
+    print("Done. Updated", CSV_PATH)
