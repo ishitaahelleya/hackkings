@@ -51,54 +51,67 @@
         </header>
 
         <section class="op-dashboard" aria-label="Opinion dashboard controls and charts">
-          <div class="op-grid">
-            <div class="op-panel op-panel--controls">
-              <div class="op-panel-header">
-                <h2 class="op-panel-title">New opinion call</h2>
-                <p class="op-panel-sub">Use your mic for speech-to-text, then analyze.</p>
-              </div>
+         <div class="op-grid">
+           <div class="op-panel op-panel--controls">
+             <div class="op-panel-header">
+               <h2 class="op-panel-title">New opinion call</h2>
+               <p class="op-panel-sub">Use your mic for speech-to-text, then analyze.</p>
+             </div>
 
-              <label class="op-label" for="phone-input">Phone number (demo)</label>
-              <input
-                id="phone-input"
-                class="op-input"
-                inputmode="tel"
-                autocomplete="tel"
-                placeholder="(555) 123-4567"
-              />
 
-              <div class="op-controls-row">
-                <button type="button" id="mic-btn" class="op-btn op-btn--secondary">
-                  <span class="op-btn-dot" aria-hidden="true"></span>
-                  <span id="mic-btn-text">Start mic</span>
-                </button>
-                <button type="button" id="clear-btn" class="op-btn op-btn--ghost">Clear</button>
-              </div>
+             <label class="op-label" for="phone-input">Phone number (demo)</label>
+             <input
+               id="phone-input"
+               class="op-input"
+               inputmode="tel"
+               autocomplete="tel"
+               placeholder="(555) 123-4567"
+             />
 
-              <label class="op-label" for="transcript-input">Transcript</label>
-              <textarea
-                id="transcript-input"
-                class="op-textarea"
-                rows="6"
-                placeholder="Speak (or type) an opinion like: 'I support a clean energy bill because it lowers costs…'"
-              ></textarea>
 
-              <div class="op-controls-row">
-                <button type="button" id="analyze-btn" class="op-btn op-btn--primary" disabled>Analyze</button>
-                <div class="op-status" id="stt-status" aria-live="polite"></div>
-              </div>
+             <div class="op-controls-row">
+               <button type="button" id="mic-btn" class="op-btn op-btn--secondary">
+                 <span class="op-btn-dot" aria-hidden="true"></span>
+                 <span id="mic-btn-text">Start mic</span>
+               </button>
+               <button type="button" id="clear-btn" class="op-btn op-btn--ghost">Clear</button>
+             </div>
 
-              <div class="op-result" id="result-card" aria-live="polite">
-                <div class="op-result-top">
-                  <div class="op-result-badge" id="result-stance">—</div>
-                  <div class="op-result-meta">
-                    <div class="op-result-issue" id="result-issue">Issue: —</div>
-                    <div class="op-result-sub" id="result-geo">Zip/District: —</div>
-                  </div>
-                </div>
-                <div class="op-result-summary" id="result-summary">Summary: —</div>
-              </div>
-            </div>
+
+             <label class="op-label" for="transcript-input">Transcript</label>
+             <textarea
+               id="transcript-input"
+               class="op-textarea"
+               rows="6"
+               placeholder="Speak (or type) an opinion like: 'I support a clean energy bill because it lowers costs…'"
+             ></textarea>
+
+
+             <label class="op-label">Stance</label>
+             <div class="op-stance-options" role="group" aria-label="Select stance">
+               <button type="button" class="op-stance-btn" data-stance="support">Support</button>
+               <button type="button" class="op-stance-btn" data-stance="neutral">Neutral</button>
+               <button type="button" class="op-stance-btn" data-stance="against">Against</button>
+             </div>
+
+
+             <div class="op-controls-row">
+               <button type="button" id="analyze-btn" class="op-btn op-btn--primary" disabled>Analyze</button>
+               <div class="op-status" id="stt-status" aria-live="polite"></div>
+             </div>
+
+
+             <div class="op-result" id="result-card" aria-live="polite">
+               <div class="op-result-top">
+                 <div class="op-result-badge" id="result-stance">—</div>
+                 <div class="op-result-meta">
+                   <div class="op-result-issue" id="result-issue">Issue: —</div>
+                   <div class="op-result-sub" id="result-geo">Zip/District: —</div>
+                 </div>
+               </div>
+               <div class="op-result-summary" id="result-summary">Summary: —</div>
+             </div>
+           </div>
 
             <div class="op-panel op-panel--insights">
               <div class="op-panel-header">
@@ -186,5 +199,26 @@
         </div>
       </section>
     </main>
+    <div id="detail-modal" class="detail-modal hidden" aria-hidden="true">
+  <div class="detail-modal-backdrop"></div>
+  <div class="detail-modal-card" role="dialog" aria-modal="true" aria-labelledby="detail-modal-title">
+    <button type="button" id="detail-modal-close" class="detail-modal-close" aria-label="Close detail view">×</button>
+    <div class="detail-modal-header">
+      <div class="detail-modal-eyebrow">Caller Detail</div>
+      <h2 id="detail-modal-title" class="detail-modal-title">—</h2>
+      <div id="detail-modal-meta" class="detail-modal-meta">—</div>
+    </div>
+    <div class="detail-modal-body">
+      <div class="detail-modal-section">
+        <div class="detail-modal-label">Summary</div>
+        <p id="detail-modal-summary" class="detail-modal-text">—</p>
+      </div>
+      <div class="detail-modal-section">
+        <div class="detail-modal-label">Full transcript / reasoning</div>
+        <p id="detail-modal-transcript" class="detail-modal-text">—</p>
+      </div>
+    </div>
+  </div>
+</div>
   </body>
 </html>

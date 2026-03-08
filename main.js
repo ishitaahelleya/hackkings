@@ -1,282 +1,455 @@
 document.addEventListener("DOMContentLoaded", async () => {
 
-  const ca09 = document.getElementById("district-ca-09");
-  const mapWrapper = document.getElementById("map-wrapper");
-  const dotLayer = document.getElementById("dot-layer");
-  const infoBox = document.getElementById("info-box");
-  const infoBoxContent = document.getElementById("info-box-content");
-  const infoBoxInner = infoBox?.querySelector(".info-box-inner");
-  const closeBtn = infoBox?.querySelector(".info-box-close");
-  const zoomOutBtn = document.getElementById("zoom-out-btn");
-  const pageLoader = document.getElementById("page-loader");
-  const svg = document.getElementById("ca-map-svg");
+const ca09 = document.getElementById("district-ca-09");
+const mapWrapper = document.getElementById("map-wrapper");
+const dotLayer = document.getElementById("dot-layer");
+const infoBox = document.getElementById("info-box");
+const infoBoxContent = document.getElementById("info-box-content");
+const infoBoxInner = infoBox?.querySelector(".info-box-inner");
+const closeBtn = infoBox?.querySelector(".info-box-close");
+const zoomOutBtn = document.getElementById("zoom-out-btn");
+const pageLoader = document.getElementById("page-loader");
+const svg = document.getElementById("ca-map-svg");
 
-  const micBtn = document.getElementById("mic-btn");
-  const micBtnText = document.getElementById("mic-btn-text");
-  const clearBtn = document.getElementById("clear-btn");
-  const phoneInput = document.getElementById("phone-input");
-  const transcriptInput = document.getElementById("transcript-input");
-  const analyzeBtn = document.getElementById("analyze-btn");
-  const sttStatus = document.getElementById("stt-status");
+const startRecordingBtn = document.getElementById("start-recording-btn");
 
-  const resultCard = document.getElementById("result-card");
-  const resultStance = document.getElementById("result-stance");
-  const resultIssue = document.getElementById("result-issue");
-  const resultGeo = document.getElementById("result-geo");
-  const resultSummary = document.getElementById("result-summary");
+const kpiTotal = document.getElementById("kpi-total");
+const kpiSupport = document.getElementById("kpi-support");
+const kpiAgainst = document.getElementById("kpi-against");
 
-  const kpiTotal = document.getElementById("kpi-total");
-  const kpiSupport = document.getElementById("kpi-support");
-  const kpiAgainst = document.getElementById("kpi-against");
+const stanceChartCanvas = document.getElementById("stance-chart");
+const issuesChartCanvas = document.getElementById("issues-chart");
+const issueFilter = document.getElementById("issue-filter");
 
-  const stanceChartCanvas = document.getElementById("stance-chart");
-  const issuesChartCanvas = document.getElementById("issues-chart");
-  const issueFilter = document.getElementById("issue-filter");
+const detailModal = document.getElementById("detail-modal");
+const detailModalClose = document.getElementById("detail-modal-close");
+const detailModalTitle = document.getElementById("detail-modal-title");
+const detailModalMeta = document.getElementById("detail-modal-meta");
+const detailModalSummary = document.getElementById("detail-modal-summary");
+const detailModalTranscript = document.getElementById("detail-modal-transcript");
 
-  const records = [];
+const records = [];
 
-  const nowIso = () => new Date().toISOString();
+let mediaRecorder = null;
+let audioChunks = [];
+let isRecording = false;
 
-  const clamp = (n,min,max)=>Math.max(min,Math.min(max,n));
+window.setTimeout(() => pageLoader?.classList.add("done"), 1600);
 
-  const mulberry32 = seed=>{
-    let a=seed>>>0;
-    return ()=>{
-      a|=0;a=(a+0x6d2b79f5)|0;
-      let t=Math.imul(a^(a>>>15),1|a);
-      t=(t+Math.imul(t^(t>>>7),61|t))^t;
-      return ((t^(t>>>14))>>>0)/4294967296;
-    };
+function clamp(n,min,max){
+  return Math.max(min,Math.min(max,n));
+}
+
+function mulberry32(seed){
+  let a = seed >>> 0;
+  return ()=>{
+    a|=0;a=(a+0x6d2b79f5)|0;
+    let t=Math.imul(a^(a>>>15),1|a);
+    t=(t+Math.imul(t^(t>>>7),61|t))^t;
+    return((t^(t>>>14))>>>0)/4294967296;
   };
+}
 
-  const hashToSeed=str=>{
-    const s=String(str??"");
-    let h=2166136261;
-    for(let i=0;i<s.length;i++){
-      h^=s.charCodeAt(i);
-      h=Math.imul(h,16777619);
-    }
-    return h>>>0;
-  };
+function hashToSeed(str){
+  let h=2166136261;
+  for(let i=0;i<str.length;i++){
+    h^=str.charCodeAt(i);
+    h=Math.imul(h,16777619);
+  }
+  return h>>>0;
+}
 
-  const deriveZipFromPhone=(p)=>{
-    const digits=String(p??"").replace(/\D/g,"");
-    const last5=digits.slice(-5);
-    return last5.length===5?last5:"95202";
-  };
-
-  const escapeHtml=v=>String(v??"")
+function escapeHtml(v){
+  return String(v??"")
     .replaceAll("&","&amp;")
     .replaceAll("<","&lt;")
-    .replaceAll(">","&gt;")
-    .replaceAll('"',"&quot;")
-    .replaceAll("'","&#039;");
+    .replaceAll(">","&gt;");
+}
 
-  const setStatus=t=>{ sttStatus.textContent=t??"" };
+function renderKPIs(){
+  kpiTotal.textContent = records.length;
+  kpiSupport.textContent =
+    records.filter(r=>r.stance==="support").length;
+  kpiAgainst.textContent =
+    records.filter(r=>r.stance==="against").length;
+}
 
-  window.setTimeout(()=>pageLoader?.classList.add("done"),1600);
+function computeStanceCounts(){
+  const c={support:0,against:0,neutral:0};
+  records.forEach(r=>c[r.stance]++);
+  return c;
+}
 
-  const clearDots=()=>{ dotLayer.innerHTML="" };
+function computeTopIssues(){
+  const map=new Map();
+  records.forEach(r=>{
+    map.set(r.issue,(map.get(r.issue)||0)+1);
+  });
+  return [...map.entries()]
+    .sort((a,b)=>b[1]-a[1])
+    .slice(0,7);
+}
 
-  const hideInfoBox=()=>{ infoBox?.classList.add("hidden") };
+let stanceChart=null;
+let issuesChart=null;
 
-  const showInfoBox=(clientX,clientY,html)=>{
-    const wrapperRect=mapWrapper.getBoundingClientRect();
-    const boxWidth=300;
-    const boxHeight=190;
+function ensureCharts(){
 
-    let left=clientX-wrapperRect.left+16;
-    let top=clientY-wrapperRect.top-boxHeight/2;
+  if(!window.Chart) return;
 
-    left=clamp(left,16,wrapperRect.width-boxWidth-16);
-    top=clamp(top,16,wrapperRect.height-boxHeight-16);
+  if(!stanceChart){
+    stanceChart = new Chart(stanceChartCanvas,{
+      type:"doughnut",
+      data:{
+        labels:["Support","Against","Neutral"],
+        datasets:[{
+          data:[0,0,0],
+          backgroundColor:[
+            "rgba(34,197,94,0.85)",
+            "rgba(239,68,68,0.85)",
+            "rgba(148,163,184,0.75)"
+          ]
+        }]
+      }
+    });
+  }
 
-    infoBox.style.setProperty("--info-left",`${left}px`);
-    infoBox.style.setProperty("--info-top",`${top}px`);
-    infoBoxContent.innerHTML=html;
-    infoBox.classList.remove("hidden");
-  };
+  if(!issuesChart){
+    issuesChart = new Chart(issuesChartCanvas,{
+      type:"bar",
+      data:{
+        labels:[],
+        datasets:[{
+          data:[],
+          backgroundColor:"rgba(250,204,21,0.7)"
+        }]
+      }
+    });
+  }
+}
 
-  const renderKPIs=()=>{
-    kpiTotal.textContent=records.length;
-    kpiSupport.textContent=records.filter(r=>r.stance==="support").length;
-    kpiAgainst.textContent=records.filter(r=>r.stance==="against").length;
-  };
+function renderCharts(){
 
-  const computeStanceCounts=()=>{
-    const c={support:0,against:0,neutral:0};
-    records.forEach(r=>{c[r.stance]+=1});
-    return c;
-  };
+  ensureCharts();
 
-  const computeTopIssues=(limit=7)=>{
-    const map=new Map();
-    records.forEach(r=>{
-      map.set(r.issue,(map.get(r.issue)||0)+1);
+  const stanceCounts = computeStanceCounts();
+
+  stanceChart.data.datasets[0].data = [
+    stanceCounts.support,
+    stanceCounts.against,
+    stanceCounts.neutral
+  ];
+
+  stanceChart.update();
+
+  const issues = computeTopIssues();
+
+  issuesChart.data.labels = issues.map(i=>i[0]);
+  issuesChart.data.datasets[0].data = issues.map(i=>i[1]);
+
+  issuesChart.update();
+}
+
+function renderIssueFilter(){
+
+  const issues=[...new Set(records.map(r=>r.issue))];
+
+  issueFilter.innerHTML="";
+
+  const all=document.createElement("option");
+  all.value="all";
+  all.textContent="All issues";
+
+  issueFilter.appendChild(all);
+
+  issues.forEach(issue=>{
+    const o=document.createElement("option");
+    o.value=issue;
+    o.textContent=issue;
+    issueFilter.appendChild(o);
+  });
+}
+
+function showInfoBox(x,y,html){
+
+  const rect = mapWrapper.getBoundingClientRect();
+
+  let left = x - rect.left + 16;
+  let top = y - rect.top - 80;
+
+  left = clamp(left,16,rect.width-260);
+
+  infoBox.style.setProperty("--info-left",`${left}px`);
+  infoBox.style.setProperty("--info-top",`${top}px`);
+
+  infoBoxContent.innerHTML = html;
+  infoBox.classList.remove("hidden");
+}
+
+function hideInfoBox(){
+  infoBox.classList.add("hidden");
+}
+
+function openDetailModal(record){
+  detailModalTitle.textContent = `Caller ${record.id}`;
+  detailModalMeta.textContent = `${record.issue} • ${record.stance}`;
+  detailModalSummary.textContent = record.summary || "No summary available.";
+  detailModalTranscript.textContent = record.transcript || "No transcript available.";
+  detailModal.classList.remove("hidden");
+  detailModal.setAttribute("aria-hidden","false");
+}
+
+function closeDetailModal(){
+  detailModal.classList.add("hidden");
+  detailModal.setAttribute("aria-hidden","true");
+}
+
+function renderDots(){
+
+  dotLayer.innerHTML="";
+
+  const rect = mapWrapper.getBoundingClientRect();
+  const districtRect = ca09.getBoundingClientRect();
+
+  const w = districtRect.width;
+  const h = districtRect.height;
+
+  records.forEach(r=>{
+
+    const dot=document.createElement("button");
+
+    dot.className=`sample-dot ${
+      r.stance==="support"
+      ?"sample-dot--green"
+      :r.stance==="against"
+      ?"sample-dot--red"
+      :"sample-dot--neutral"
+    }`;
+
+    const size=r.dot.size;
+
+    dot.style.width=size+"px";
+    dot.style.height=size+"px";
+
+    const x=districtRect.left+r.dot.nx*w;
+    const y=districtRect.top+r.dot.ny*h;
+
+    dot.style.left=(x-rect.left-size/2)+"px";
+    dot.style.top=(y-rect.top-size/2)+"px";
+
+    dot.addEventListener("click",e=>{
+
+      e.stopPropagation();
+
+      showInfoBox(e.clientX,e.clientY,`
+
+<div style="font-weight:700;margin-bottom:4px;">
+Caller ${r.id}
+</div>
+
+<div style="font-size:12px;color:#94a3b8;margin-bottom:6px;">
+${escapeHtml(r.issue)} • ${escapeHtml(r.stance)}
+</div>
+
+<div style="font-size:13px;">
+${escapeHtml(r.summary)}
+</div>
+
+<button
+  type="button"
+  class="dot-popup-more-btn"
+  data-record-id="${escapeHtml(r.id)}"
+  style="
+    margin-top:8px;
+    padding:4px 8px;
+    border-radius:8px;
+    border:1px solid rgba(255,255,255,0.2);
+    background:rgba(15,23,42,0.8);
+    color:white;
+    font-size:12px;
+    cursor:pointer;
+  "
+>
+More
+</button>
+
+      `);
+
+      const moreBtn = infoBoxContent.querySelector(".dot-popup-more-btn");
+      if(moreBtn){
+        moreBtn.addEventListener("click",(evt)=>{
+          evt.stopPropagation();
+          openDetailModal(r);
+        });
+      }
+
     });
 
-    return [...map.entries()]
-      .sort((a,b)=>b[1]-a[1])
-      .slice(0,limit);
-  };
+    dotLayer.appendChild(dot);
+  });
+}
 
-  let stanceChart=null;
-  let issuesChart=null;
-
-  const ensureCharts=()=>{
-    const Chart=window.Chart;
-    if(!Chart)return;
-
-    if(!stanceChart){
-      stanceChart=new Chart(stanceChartCanvas,{
-        type:"doughnut",
-        data:{
-          labels:["Support","Against","Neutral"],
-          datasets:[{
-            data:[0,0,0],
-            backgroundColor:[
-              "rgba(34,197,94,0.85)",
-              "rgba(239,68,68,0.85)",
-              "rgba(148,163,184,0.75)"
-            ]
-          }]
-        }
-      });
-    }
-
-    if(!issuesChart){
-      issuesChart=new Chart(issuesChartCanvas,{
-        type:"bar",
-        data:{
-          labels:[],
-          datasets:[{
-            label:"Calls",
-            data:[],
-            backgroundColor:"rgba(250,204,21,0.7)"
-          }]
-        }
-      });
-    }
-  };
-
-  const renderCharts=()=>{
-    ensureCharts();
-    if(!stanceChart||!issuesChart)return;
-
-    const stanceCounts=computeStanceCounts();
-
-    stanceChart.data.datasets[0].data=[
-      stanceCounts.support,
-      stanceCounts.against,
-      stanceCounts.neutral
-    ];
-
-    stanceChart.update();
-
-    const issues=computeTopIssues();
-
-    issuesChart.data.labels=issues.map(i=>i[0]);
-    issuesChart.data.datasets[0].data=issues.map(i=>i[1]);
-
-    issuesChart.update();
-  };
-
-  const renderIssueFilter=()=>{
-    const selected=issueFilter.value||"all";
-    const issues=[...new Set(records.map(r=>r.issue))];
-
-    issueFilter.innerHTML="";
-
-    const all=document.createElement("option");
-    all.value="all";
-    all.textContent="All issues";
-    issueFilter.appendChild(all);
-
-    issues.forEach(issue=>{
-      const o=document.createElement("option");
-      o.value=issue;
-      o.textContent=issue;
-      issueFilter.appendChild(o);
-    });
-
-    issueFilter.value=issues.includes(selected)?selected:"all";
-  };
-
-  const upsertRecord=r=>{
-    records.unshift(r);
-    renderIssueFilter();
-    renderKPIs();
-    renderCharts();
-  };
-
-  // CSV LOADER
-  const loadCSVRecords=async()=>{
-    try {
-    const res=await fetch("calls_dataset.csv");
-    if(!res.ok)return;
-    const text=await res.text();
-
-    const rows=text.trim().split("\n");
-    const headers=rows[0].split(",");
-
-    for(let i=1;i<rows.length;i++){
-
-      const values=rows[i].split(",");
-      const row={};
-
-      headers.forEach((h,j)=>{
-        row[h.trim()]=values[j]?values[j].trim():"";
-      });
-
-      const id=`csv_${i}`;
-      const rng=mulberry32(hashToSeed(id));
-
-      const stance=
-        row.issue_stance?.toLowerCase() ||
-        row.bill_stance?.toLowerCase() ||
-        "neutral";
-
-      const issue=
-        row.issue_name ||
-        row.bill_name ||
-        "General Policy";
-
-      const summary=
-        row.issue_reason ||
-        row.bill_reason ||
-        row.transcript_text?.slice(0,180) ||
-        "No summary available";
-
-      upsertRecord({
-        id,
-        createdAt:row.call_timestamp||nowIso(),
-        phone:row.phone_number||"0000000000",
-        zipcode:row.zip_code||deriveZipFromPhone(row.phone_number),
-        district:row.district||"CA-09",
-        issue,
-        stance:stance==="support"||stance==="against"?stance:"neutral",
-        summary,
-        transcript:row.transcript_text||"",
-        dot:{
-          nx:rng(),
-          ny:rng(),
-          size:12+rng()*16
-        }
-      });
-    }
-    } catch (_) {
-      // CSV missing or invalid – run with empty records
-    }
-  };
-
-  await loadCSVRecords();
-
-  renderIssueFilter();
+function upsertRecord(r){
+  records.push(r);
   renderKPIs();
   renderCharts();
+  renderIssueFilter();
+  renderDots();
+}
 
-  analyzeBtn.disabled = transcriptInput.value.trim().length === 0;
+function zoomToCA09(){
 
-  setStatus("Ready. Click Start mic to record.");
+  const bbox = ca09.getBBox();
+  const pad = 20;
+
+  const viewBox = [
+    bbox.x - pad,
+    bbox.y - pad,
+    bbox.width + pad*2,
+    bbox.height + pad*2
+  ].join(" ");
+
+  svg.setAttribute("viewBox",viewBox);
+  mapWrapper.classList.add("is-zoomed");
+}
+
+async function loadCSV(){
+
+  const res = await fetch("calls_dataset.csv");
+  const text = await res.text();
+
+  const rows = text.split("\n").slice(1);
+
+  rows.forEach((line,i)=>{
+
+    if(!line.trim()) return;
+
+    const cols=line.match(/(".*?"|[^",]+)(?=\s*,|\s*$)/g);
+    if(!cols || cols.length < 2) return;
+
+    const clean = cols.map(v => String(v).replace(/^"|"$/g, "").trim());
+
+    const transcript = clean[1] || "";
+    const billName = clean[2] || "";
+    const billStance = clean[3] || "";
+    const billReason = clean[4] || "";
+    const issueName = clean[5] || "";
+    const issueStance = clean[6] || "";
+    const issueReason = clean[7] || "";
+
+    const stance =
+      issueStance.toLowerCase() ||
+      billStance.toLowerCase() ||
+      "neutral";
+
+    const issue =
+      issueName ||
+      billName ||
+      "General Policy";
+
+    const summary =
+      issueReason ||
+      billReason ||
+      transcript.slice(0,120);
+
+    const id = String(i+1);
+
+    const rng = mulberry32(hashToSeed(id));
+
+    upsertRecord({
+      id,
+      issue,
+      stance: stance==="support"||stance==="against"?stance:"neutral",
+      summary,
+      transcript,
+      dot:{
+        nx:rng(),
+        ny:rng(),
+        size:12+rng()*16
+      }
+    });
+
+  });
+}
+
+await loadCSV();
+
+zoomToCA09();
+
+renderKPIs();
+renderCharts();
+renderIssueFilter();
+renderDots();
+
+closeBtn?.addEventListener("click",(e)=>{
+  e.stopPropagation();
+  hideInfoBox();
+});
+
+infoBoxInner?.addEventListener("click",(e)=>{
+  e.stopPropagation();
+});
+
+mapWrapper?.addEventListener("click",()=>{
+  hideInfoBox();
+});
+
+detailModalClose?.addEventListener("click", closeDetailModal);
+
+detailModal?.querySelector(".detail-modal-backdrop")?.addEventListener("click", closeDetailModal);
+
+document.addEventListener("keydown",(e)=>{
+  if(e.key === "Escape"){
+    hideInfoBox();
+    closeDetailModal();
+  }
+});
+
+/* =========================
+   RECORDING BUTTON LOGIC
+   ========================= */
+
+startRecordingBtn?.addEventListener("click", async () => {
+
+  if(!isRecording){
+
+    try{
+      const stream = await navigator.mediaDevices.getUserMedia({audio:true});
+
+      mediaRecorder = new MediaRecorder(stream);
+      audioChunks = [];
+
+      mediaRecorder.ondataavailable = e=>{
+        if(e.data.size>0) audioChunks.push(e.data);
+      };
+
+      mediaRecorder.onstop = ()=>{
+        const blob = new Blob(audioChunks,{type:"audio/webm"});
+        const url = URL.createObjectURL(blob);
+
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = "recording.webm";
+        a.click();
+      };
+
+      mediaRecorder.start();
+      isRecording = true;
+      startRecordingBtn.textContent = "Stop Recording";
+
+    }catch(err){
+      console.error("Microphone access denied",err);
+      alert("Microphone permission is required to record.");
+    }
+
+  } else {
+
+    mediaRecorder.stop();
+    isRecording = false;
+    startRecordingBtn.textContent = "Start Recording";
+
+  }
+
+});
 
 });
