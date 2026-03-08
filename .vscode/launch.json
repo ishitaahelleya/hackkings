@@ -1,0 +1,16 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    
+    {
+      "type": "node",
+      "request": "launch",
+      "name": "Open Safari",
+      "runtimeExecutable": "/bin/sh",
+      "args": [
+        "-c",
+        "open -a Safari http://localhost:3000"
+      ]
+    }
+  ]
+}

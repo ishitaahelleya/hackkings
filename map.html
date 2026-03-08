@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>CA-09 District</title>
+
+<script src="https://d3js.org/d3.v7.min.js"></script>
+
+<style>
+body {
+  margin:0;
+  background:white;
+}
+
+svg {
+  width:100vw;
+  height:100vh;
+}
+</style>
+
+</head>
+
+<body>
+
+<svg></svg>
+
+<script>
+
+const width = window.innerWidth;
+const height = window.innerHeight;
+
+const svg = d3.select("svg");
+
+d3.json("ca09.geojson").then(data => {
+
+    const projection = d3.geoMercator()
+        .fitSize([width, height], data);
+
+    const path = d3.geoPath().projection(projection);
+
+    svg.selectAll("path")
+        .data(data.features)
+        .enter()
+        .append("path")
+        .attr("d", path)
+        .attr("fill", "#4A90E2")
+        .attr("stroke", "#000")
+        .attr("stroke-width", 1);
+
+});
+
+</script>
+
+</body>
+</html>

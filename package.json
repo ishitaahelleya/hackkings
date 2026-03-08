@@ -1,0 +1,15 @@
+{
+  "name": "magic-ui-landing",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Recreated Magic UI-style animated landing hero section.",
+  "scripts": {
+    "start": "npx serve .",
+    "preview": "npx serve ."
+  },
+  "keywords": [
+    "landing-page",
+    "magic-ui",
+    "animated-hero"
+  ]
+}

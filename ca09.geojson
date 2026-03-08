@@ -1,0 +1,21 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "California District 09"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[
+          [-121.556, 38.119],
+          [-121.556, 37.707],
+          [-121.028, 37.707],
+          [-121.028, 38.119],
+          [-121.556, 38.119]
+        ]]
+      }
+    }
+  ]
+}
